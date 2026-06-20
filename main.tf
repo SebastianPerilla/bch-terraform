@@ -59,6 +59,7 @@ resource "google_bigquery_dataset" "data_marts" {
   depends_on    = [google_project_service.bigquery]
 }
 
+# Service Account
 # Create a Service Account
 resource "google_service_account" "service_account" {
   project      = google_project.astrafy_project.project_id
@@ -72,10 +73,7 @@ resource "google_service_account_key" "dbt_ci_key" {
   private_key_type   = "TYPE_GOOGLE_CREDENTIALS_FILE"
 }
 
-# ============================================================================
-# IAM PERMISSIONS (LEAST PRIVILEGE LAYER)
-# ============================================================================
-
+# IAM
 # 1. Project-wide permission: ONLY allow the SA to execute query jobs
 resource "google_project_iam_member" "job_user" {
   project = google_project.astrafy_project.project_id
