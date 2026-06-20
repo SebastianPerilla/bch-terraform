@@ -112,7 +112,11 @@ terraform output -raw dbt_ci_runner_private_key | base64 --decode > dbt-ci-key.j
 ### Note
 Running this command will generate a local file named `dbt-ci-key.json`. 
 
-Once you copy this payload and paste it into your GitHub Secrets tab, permanently delete the local file via (`rm -f dbt-ci-key.json`) to keep your workstation secure. 
+Once you copy this payload and paste it into your GitHub Secrets tab, permanently delete the local file via:
+
+```bash
+`rm -f dbt-ci-key.json`
+```
 
 `Never commit this JSON file to version control.`
 
