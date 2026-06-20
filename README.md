@@ -1,42 +1,46 @@
 # BCH Terraform
 
-Terraform infrastructure for the Data Engineering Take-Home Challenge.
+Terraform infrastructure for the Astrafy Data Engineering Take-Home Challenge.
 
 ## Overview
 
-This repository provisions the Google Cloud resources required for the Bitcoin Cash analytics pipeline.
+This repository provisions all Google Cloud resources required for the Bitcoin Cash analytics pipeline.
 
 The infrastructure includes:
 
-* A new Google Cloud project
+* A dedicated Google Cloud project
 * A BigQuery staging dataset
 * A BigQuery mart dataset
-* A service account for dbt
+* A service account for dbt and CI/CD operations
 * Required BigQuery IAM permissions
+* A service account key generated through Terraform for GitHub Actions authentication
 
-All resources are created through Terraform to satisfy the assignment requirement of using Infrastructure as Code (IaC). 
+All resources are created and managed through Terraform, ensuring a fully reproducible Infrastructure as Code (IaC) deployment.
 
 ---
 
-## Resources Created
+## Infrastructure Resources
 
-| Resource                 | Purpose                                       |
-| ------------------------ | --------------------------------------------- |
-| Google Cloud Project     | Dedicated environment for the challenge       |
-| BigQuery Staging Dataset | Stores staging models                         |
-| BigQuery Mart Dataset    | Stores analytics/data mart models             |
-| Service Account          | Used by dbt and GitHub Actions                |
-| IAM Roles                | Grants BigQuery access to the service account |
+| Resource                                 | Purpose                                         |
+| ---------------------------------------- | ----------------------------------------------- |
+| Google Cloud Project                     | Dedicated environment for the challenge         |
+| BigQuery Staging Dataset (`bch_staging`) | Stores staging models                           |
+| BigQuery Mart Dataset (`bch_mart`)       | Stores analytics and data mart models           |
+| Service Account (`dbt-ci-runner`)        | Used by dbt and GitHub Actions                  |
+| Service Account Key                      | Used by GitHub Actions to authenticate with GCP |
+| IAM Roles                                | Grants BigQuery access to the service account   |
 
 ---
 
 ## Prerequisites
 
-* Terraform >= 1.10
-* Google Cloud SDK (`gcloud`)
+Before deploying the infrastructure, install:
+
+* [Terraform CLI](https://developer.hashicorp.com/terraform/downloads) (>= 1.5.0)
+* [Google Cloud SDK (gcloud)](https://cloud.google.com/sdk/docs/install)
 * An active Google Cloud Billing Account
 
-Authenticate before running Terraform:
+Authenticate using Application Default Credentials (ADC):
 
 ```bash
 gcloud auth application-default login
@@ -46,25 +50,25 @@ gcloud auth application-default login
 
 ## Deployment
 
-Initialize Terraform:
+### 1. Initialize Terraform
 
 ```bash
 terraform init
 ```
 
-Review the execution plan:
+### 2. Review the Execution Plan
 
 ```bash
 terraform plan
 ```
 
-Deploy the infrastructure:
+### 3. Deploy the Infrastructure
 
 ```bash
 terraform apply
 ```
 
-Destroy all resources:
+### 4. Destroy Resources (Optional)
 
 ```bash
 terraform destroy
@@ -74,60 +78,65 @@ terraform destroy
 
 ## Outputs
 
-After deployment, Terraform provides:
+After a successful deployment, Terraform outputs:
 
 * Google Cloud Project ID
+* BigQuery Staging Dataset ID
+* BigQuery Mart Dataset ID
 * Service Account Email
-* BigQuery Dataset IDs
+* Service Account Key (used for GitHub Actions authentication)
 
-These values are used by the `bch-dbt` repository and GitHub Actions workflow.
+The generated service account key can be stored as a GitHub repository secret (`GCP_SA_KEY`) and used by the CI/CD pipeline in the `bch-dbt` repository.
+
+## Automated Credential Management & Key Generation
+
+To support a 100% pure, automated GitOps deployment workflow, this repository is configured to fully manage the lifecycle of the dbt CI/CD cryptographic credentials inside the Terraform state.
+
+### How it Works
+Instead of requiring manual key creation through the Google Cloud Console UI or the `gcloud` CLI, Terraform automatically mints, manages, and outputs the service account private key pair using the following architecture:
+
+1. **`google_service_account_key.dbt_ci_key`**: Instructs Google Cloud to securely generate a new private/public key pair for the `dbt-ci-runner` account.
+2. **Masked Sensitive Outputs**: The private key payload is stored in `opts.tf` and explicitly designated as `sensitive = true`. This prevents the plaintext credential from ever being accidentally leaked onto your monitor or into public CI/CD build execution logs during a `terraform apply`.
+
+---
+
+###  How to Retrieve the Key for GitHub Secrets
+
+If you are spinning up this infrastructure yourself, you can securely extract the clean, raw JSON payload directly from the encrypted state layer to populate your GitHub Repository secret (`GCP_SERVICE_ACCOUNT_KEY`).
+
+Run the following command in your terminal after deployment:
+
+```bash
+terraform output -raw dbt_ci_runner_private_key | base64 --decode > dbt-ci-key.json
+```
+### Note
+Running this command will generate a local file named `dbt-ci-key.json`. 
+
+Once you copy this payload and paste it into your GitHub Secrets tab, permanently delete the local file via (`rm -f dbt-ci-key.json`) to keep your workstation secure. 
+
+`Never commit this JSON file to version control.`
 
 ---
 
 ## Assignment Requirements Covered
 
-* Create a new Google Cloud project using Terraform
-* Create BigQuery datasets for staging and mart tables
-* Provision a service account
-* Assign required BigQuery permissions
-* No manual resource creation outside Terraform
+This repository satisfies the Infrastructure as Code requirements by:
+
+* Creating a new Google Cloud project using Terraform
+* Creating BigQuery datasets for staging and data mart tables
+* Provisioning a dedicated service account
+* Assigning the required BigQuery permissions
+* Generating a service account key for CI/CD authentication
+* Avoiding manual resource creation outside Terraform
 
 ---
 
 ## Related Repository
+- [`dbt Project`](https://github.com/SebastianPerilla/bch-dbt)
 
-**dbt Project:** [`bch-dbt`](https://github.com/SebastianPerilla/bch-dbt)
+The dbt repository contains:
+* Staging and mart models
+* GitHub Actions CI workflow
+* BigQuery transformations for the Bitcoin Cash dataset
 
-Contains the dbt models and GitHub Actions workflow that use the infrastructure provisioned by this repository.
-
-## Prerequisites & Dependencies
-To run this infrastructure locally, you need the following tools installed:
-- [Terraform CLI](https://developer.hashicorp.com/terraform/downloads) (>= 1.5.0)
-- [Google Cloud SDK (gcloud CLI)](https://cloud.google.com/sdk/docs/install)
-
-## Infrastructure Resources Provisioned
-- 1x Google Cloud Project (`bch-thc-astrafy`)
-- 1x BigQuery Staging Dataset (`bch_staging`) located in `US`
-- 1x BigQuery Data Mart Dataset (`bch_mart`) located in `US`
-- 1x Service Account (`dbt-ci-runner`) with BigQuery Job User and Data Editor roles for CI/CD automation.
-
-## How to Initialize & Apply
-1. Authenticate your local shell with GCP Application Default Credentials (ADC):
-   ```bash
-   gcloud auth application-default login bch-thc-astrafy
-   ```
-
-2. Initilize the Backend Infra with the following commands
-    ```bash
-    terraform init
-    ```
-
-3. Preview the Plan
-    ```bash
-    terraform plan
-    ```
-
-4. Apply and Deploy the resources
-    ```bash
-    terraform apply
-    ```
+This Terraform repository provides the infrastructure consumed by that project.
